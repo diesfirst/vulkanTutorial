@@ -155,6 +155,7 @@ class HelloTriangleApplication {
 		VkDescriptorPool descriptorPool;
 		VkImage textureImage;
 		VkImageView textureImageView;
+		VkSampler textureSampler;
 		VkDeviceMemory textureImageMemory;
 		std::vector<VkDescriptorSet> descriptorSets;
 		size_t currentFrame = 0;
@@ -421,6 +422,7 @@ class HelloTriangleApplication {
 			createCommandPool();
 			createTextureImage();
 			createTextureImageView();
+			createTextureSampler();
 			createVertexBuffer();
 			createIndexBuffer();
 			createUniformBuffers();
@@ -488,10 +490,23 @@ class HelloTriangleApplication {
 			ubuLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			ubuLayoutBinding.pImmutableSamplers = nullptr;
 
+			VkDescriptorSetLayoutBinding samplerLayoutBinding {};
+			samplerLayoutBinding.binding = 1;
+			samplerLayoutBinding.descriptorCount = 1;
+			samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			samplerLayoutBinding.pImmutableSamplers = nullptr;
+			samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+			std::array<VkDescriptorSetLayoutBinding, 2> bindings =
+			{
+				ubuLayoutBinding,
+				samplerLayoutBinding
+			};
+
 			VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			layoutInfo.bindingCount = 1;
-			layoutInfo.pBindings = &ubuLayoutBinding;
+			layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+			layoutInfo.pBindings = bindings.data();
 
 			if (vkCreateDescriptorSetLayout(
 						device, 
@@ -885,6 +900,38 @@ class HelloTriangleApplication {
 		void createTextureImageView() 
 		{
 			textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_UNORM);
+		}
+
+		void createTextureSampler()
+		{
+			VkSamplerCreateInfo samplerInfo {};
+			samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			samplerInfo.magFilter = VK_FILTER_LINEAR;
+			samplerInfo.minFilter = VK_FILTER_LINEAR;
+			samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerInfo.anisotropyEnable = VK_TRUE;
+			samplerInfo.maxAnisotropy = 16;
+			samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+			samplerInfo.unnormalizedCoordinates = VK_FALSE;
+			samplerInfo.compareEnable = VK_FALSE;
+			samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+			samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			samplerInfo.mipLodBias = 0.0f;
+			samplerInfo.minLod = 0.0f;
+			samplerInfo.maxLod = 0.0f;
+
+			if (vkCreateSampler(
+						device, 
+						&samplerInfo,
+						nullptr,
+						&textureSampler)
+					!= VK_SUCCESS)
+			{
+				throw std::runtime_error("failed to create texture sampler!");
+			}
+
 		}
 
 		VkImageView createImageView(VkImage image, VkFormat format) 
@@ -1434,6 +1481,7 @@ class HelloTriangleApplication {
 			}
 
 			VkPhysicalDeviceFeatures deviceFeatures {};
+			deviceFeatures.samplerAnisotropy = VK_TRUE;
 
 			VkDeviceCreateInfo createInfo = {};
 			createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -1742,6 +1790,7 @@ class HelloTriangleApplication {
 		void cleanup() {
 			cleanUpSwapChain();
 
+			vkDestroySampler(device, textureSampler, nullptr);
 			vkDestroyImageView(device, textureImageView, nullptr);
 
 			vkDestroyImage(device, textureImage, nullptr);
