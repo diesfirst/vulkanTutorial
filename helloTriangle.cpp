@@ -2,8 +2,10 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define STB_IMAGE_IMPLEMENTATION
+#define TINYOBJLOADER_IMPLEMENTATION
 
 #include <stb_image.h>
+#include <tiny_obj_loader.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -129,26 +131,6 @@ struct UniformBufferObject
 	alignas(16) glm::mat4 proj;
 };
 
-const std::vector<Vertex> vertices = 
-{
-	{{0.5f, -0.5f, 0.0}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-	{{0.5f, 0.5f, 0.0}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-	{{-0.5f, 0.5f, 0.0}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-	{{-0.5f, -0.5f, 0.0}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
-
-	{{0.5f, -0.5f, -0.5}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-	{{0.5f, 0.5f, -0.5}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-	{{-0.5f, 0.5f, -0.5}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-	{{-0.5f, -0.5f, -0.5}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
-
-
-};
-
-const std::vector<uint16_t> indices = {
-	0, 1, 2, 2, 3, 0,
-	4, 5, 6, 6, 7, 4
-};
-
 class HelloTriangleApplication {
 	public:
 		GLFWwindow* window;
@@ -200,6 +182,8 @@ class HelloTriangleApplication {
 		std::vector<VkImageView> swapChainImageViews;
 		std::vector<VkFramebuffer> swapChainFramebuffers;
 		std::vector<VkCommandBuffer> commandBuffers;
+		std::vector<Vertex> vertices;
+		std::vector<uint32_t> indices;
 		
 		inline static mouseInput mouseinput;
 
@@ -455,6 +439,7 @@ class HelloTriangleApplication {
 			createTextureImage();
 			createTextureImageView();
 			createTextureSampler();
+			loadModel();
 			createVertexBuffer();
 			createIndexBuffer();
 			createUniformBuffers();
@@ -1335,6 +1320,50 @@ class HelloTriangleApplication {
 			vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 		}
 
+		void loadModel()
+		{
+			tinyobj::attrib_t attrib;
+			std::vector<tinyobj::shape_t> shapes;
+			std::vector<tinyobj::material_t> materials;
+			std::string warn, err;
+
+			if (!tinyobj::LoadObj(
+						&attrib,
+						&shapes,
+						&materials,
+						&warn,
+						&err,
+						MODEL_PATH.c_str()))
+			{
+				throw std::runtime_error(warn + err);
+			}
+
+			for (const auto& shape : shapes)
+			{
+				for (const auto& index : shape.mesh.indices)
+				{
+					Vertex vertex {};
+
+					vertex.pos = 
+					{
+						attrib.vertices[3 * index.vertex_index + 0],
+						attrib.vertices[3 * index.vertex_index + 1],
+						attrib.vertices[3 * index.vertex_index + 2],
+					};
+
+					vertex.texCoord = 
+					{
+						attrib.texcoords[2 * index.texcoord_index + 0],
+						1.0f - attrib.texcoords[2 * index.texcoord_index + 1],
+					};
+
+					vertex.color = {1.0f, 1.0f, 1.0f};
+
+					vertices.push_back(vertex);
+					indices.push_back(indices.size());
+				}
+			}
+		}
 
 		void createVertexBuffer() 
 		{
@@ -1551,15 +1580,30 @@ class HelloTriangleApplication {
 				renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 				renderPassInfo.pClearValues = clearValues.data();
 				
-				vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+				vkCmdBeginRenderPass(
+						commandBuffers[i], 
+						&renderPassInfo, 
+						VK_SUBPASS_CONTENTS_INLINE);
 
-				vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+				vkCmdBindPipeline(
+						commandBuffers[i], 
+						VK_PIPELINE_BIND_POINT_GRAPHICS, 
+						graphicsPipeline);
 
 				VkBuffer vertexBuffers[] = {vertexBuffer};
 				VkDeviceSize offsets[] = {0};
-				vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+				vkCmdBindVertexBuffers(
+						commandBuffers[i], 
+						0, 
+						1, 
+						vertexBuffers, 
+						offsets);
 
-				vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+				vkCmdBindIndexBuffer(
+						commandBuffers[i], 
+						indexBuffer, 
+						0, 
+						VK_INDEX_TYPE_UINT32);
 
 				vkCmdBindDescriptorSets(
 						commandBuffers[i],
@@ -1571,7 +1615,13 @@ class HelloTriangleApplication {
 						0,
 						nullptr);
 
-				vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+				vkCmdDrawIndexed(
+						commandBuffers[i], 
+						static_cast<uint32_t>(indices.size()), 
+						1, 
+						0, 
+						0, 
+						0);
 
 				vkCmdEndRenderPass(commandBuffers[i]);
 
