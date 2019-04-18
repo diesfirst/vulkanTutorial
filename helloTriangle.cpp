@@ -155,6 +155,14 @@ struct UniformBufferObject
 	alignas(16) glm::mat4 proj;
 };
 
+static glm::mat4 currentModelTransform = glm::mat4(1.0); //identity matrix
+static float currentXPos = 0.0f;
+static float currentYPos = 0.0f;
+static float xPos = 0.0f;
+static float yPos = 0.0f;
+static bool inModelTransformState {false};
+static UniformBufferObject ubo {};
+
 class HelloTriangleApplication {
 	public:
 		GLFWwindow* window;
@@ -435,13 +443,36 @@ class HelloTriangleApplication {
 			glfwSetWindowUserPointer(window, this);
 			glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 			glfwSetCursorPosCallback(window, cursorPositionCallback);
+			glfwSetKeyCallback(window, keyCallback);
 		}
 
-		static void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
+		static void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos) 
+		{
 			mouseinput.setCursorPos(xpos, ypos);
 		}
+		
+		static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+		{
+			if (key == GLFW_KEY_M && action == GLFW_PRESS) 
+			{
+				if (!inModelTransformState)
+				{
+					std::cout << "Entered Model Transform State" << std::endl;
+					inModelTransformState = true;
+					currentXPos = mouseinput.getX();
+					currentYPos = mouseinput.getY();
+				}
+				else 
+				{
+					std::cout << "Exitted Model Transform State" << std::endl;
+					inModelTransformState = false;
+					currentModelTransform = ubo.model;
+				}
+			}
+		}
 
-		static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
+		static void framebufferResizeCallback(GLFWwindow* window, int width, int height) 
+		{
 			auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
 			app->framebufferResized = true;
 		}
@@ -1972,20 +2003,23 @@ class HelloTriangleApplication {
 		}
 
 		void myUpdateUniformBuffer(uint32_t currentImage) {
-			UniformBufferObject ubo {};
-			float xAngle, yAngle; 
-			xAngle = mouseinput.getX();
-			yAngle = mouseinput.getY();
-			ubo.model = glm::rotate(
-					glm::mat4(1.0f), 
-					glm::radians(xAngle), 
-					glm::vec3(0.0f, 0.0f, 1.0f)
-					);
-			ubo.model *= glm::rotate(
-					glm::mat4(1.0f), 
-					glm::radians(yAngle), 
-					glm::vec3(0.0f, 1.0f, 0.0f)
-					);
+//			UniformBufferObject ubo {};
+			ubo.model = currentModelTransform;
+			if (inModelTransformState)
+			{
+				xPos = mouseinput.getX() - currentXPos;
+				yPos = mouseinput.getY() - currentYPos;
+				ubo.model *= glm::rotate(
+						glm::mat4(1.0f), 
+						glm::radians(xPos), 
+						glm::vec3(0.0f, 0.0f, 1.0f)
+						);
+				ubo.model *= glm::rotate(
+						glm::mat4(1.0f), 
+						glm::radians(yPos), 
+						glm::vec3(0.0f, 1.0f, 0.0f)
+						);
+			}
 			ubo.view = glm::lookAt(
 					glm::vec3(2.0f, 2.0f, 2.0f),
 					glm::vec3(0.0f, 0.0f, 0.0f),

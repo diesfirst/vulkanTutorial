@@ -1,6 +1,6 @@
 VULKAN_SDK_PATH = /usr
 
-CFLAGS = -std=c++17 -g -O3 
+CFLAGS = -std=c++17 -g  
 LDFLAGS = -I/usr/include/vulkan -L/usr/lib/x86_64-linux-gnu `pkg-config --static --libs glfw3` -lvulkan
 
 VulkanTest: main.cpp helloTriangle.cpp shaders/vert.spv shaders/frag.spv
