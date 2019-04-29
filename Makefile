@@ -6,6 +6,9 @@ LDFLAGS = -I/usr/include/vulkan -L/usr/lib/x86_64-linux-gnu `pkg-config --static
 VulkanTest: main.cpp helloTriangle.cpp shaders/vert.spv shaders/frag.spv
 	g++-7 $(CFLAGS) -o VulkanTest main.cpp mouseInput.cpp $(LDFLAGS)
 
+window: testWindow.cpp window.hpp
+	g++-7 -std=c++17 -g -Wall -o openWindow testWindow.cpp $(LDFLAGS)
+
 .PHONY: test clean
 
 test: VulkanTest
